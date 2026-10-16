@@ -1,37 +1,26 @@
-# Exelo Agent Kit
 
-A runnable React/Vite implementation of an Exelo-style AI receptionist operating-system landing page, packaged with the specifications and agent instructions needed to extend it with Claude Code, Codex, Cursor, or another coding agent.
+## Install the agent plugin
 
-## Run locally
-
-```bash
-npm install
-npm run validate
-npm run dev
-```
-
-Open the local Vite URL shown in the terminal. To create a production build, run `npm run build`.
-
-## Included functionality
-
-The app includes a responsive sticky header and mobile menu, a phone-call hero scene, portal dashboard mockup, six-step workflow navigator, infrastructure cards, live profit calculator, system flow, pricing plan tabs, monthly/annual billing toggle, comparison section, FAQ accordion, closing CTA, and responsive footer.
-
-## Repository map
-
-`src/main.jsx` contains the working React implementation. `src/styles.css` contains the responsive design system. `spec/` contains the product, UI, and acceptance specifications. `data/product.json` contains reusable product settings. `skill/SKILL.md` and `AGENTS.md` contain instructions for coding agents.
-
-## GitHub handoff
+The repo now includes a Claude Code-compatible hub skill and runtime helper. From a clone:
 
 ```bash
-git add .
-git commit -m "Create runnable Exelo agent-ready landing app"
-git branch -M main
-git remote add origin https://github.com/YOUR_ACCOUNT/YOUR_REPO.git
-git push -u origin main
+bash install.sh
+claude
 ```
 
-The implementation intentionally mocks telephony, business scanning, billing, and backend persistence. The UI state and behavior are real; production integrations should be added behind clear service boundaries.
+Then run:
 
-## Reference boundary
+```text
+/exelo doctor
+/exelo setup
+/exelo scan "dentists in San Diego"
+/exelo prospect "Harborview Dental, San Diego"
+/exelo proposal "Harborview Dental"
+/exelo configure "Harborview Dental"
+/exelo test-line "Harborview Dental"
+/exelo deploy "Harborview Dental"
+```
 
-This repo is a functional and visual reconstruction derived from observing the public page at `https://exelo.ai/#how`. It does not contain private source code, credentials, private APIs, or proprietary production assets. Replace branding and copy when building a separate product or use it only with appropriate authorization.
+The installer places the hub at `~/.claude/skills/exelo/SKILL.md`, the deterministic runtime at `~/.claude/skills/exelo/scripts/exelo`, and specialist agents in `~/.claude/agents/`. Set `EXELO_FORCE=1` to replace an existing install. Use `bash uninstall.sh` to remove the manual install.
+
+The initial `scan` command creates a run folder under `.exelo/runs/` and marks it `needs-research`; the agent then verifies public evidence and writes the opportunity report. Real telephony, billing, and business-data connectors are intentionally adapter boundaries until configured.

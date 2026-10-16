@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKSPACE="${EXELO_WORKSPACE:-.exelo}"
+
+usage() {
+  cat <<'EOF'
+Exelo runtime helper
+
+Usage:
+  exelo doctor
+  exelo scan <business, city, URL, or query>
+  exelo validate-config <path>
+EOF
+}
+
+slugify() {
+  printf '%s' "$*" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
+}
+
+case "${1:-}" in
+  doctor)
+    python3 - "$ROOT_DIR" "$WORKSPACE" <<'PY'
+import json, os, shutil, sys
+root, workspace = sys.argv[1:]
+config_path = os.path.join(workspace, 'config.json')
+result = {
+  'runtime': {'python': shutil.which('python3') is not None, 'node': shutil.which('node') is not None, 'git': shutil.which('git') is not None},
+  'root': os.path.abspath(root),
+  'workspace': os.path.abspath(workspace),
+  'workspace_exists': os.path.isdir(workspace),
+  'config_exists': os.path.isfile(config_path),
+  'config_valid': False,
+  'providers': {'businessData': 'manual', 'telephony': 'mock', 'email': 'file'}
+}
+if result['config_exists']:
+  try:
+    with open(config_path, encoding='utf-8') as f: cfg = json.load(f)
+    result['config_valid'] = isinstance(cfg, dict) and cfg.get('version') == 1
+    if isinstance(cfg, dict): result['providers'].update({k: cfg[k] for k in ('businessDataProvider','telephonyProvider','emailProvider') if k in cfg})
+  except Exception as exc:
+    result['config_error'] = str(exc)
+print(json.dumps(result, indent=2))
+PY
+    ;;
+  scan)
+    shift
+    [ "$#" -gt 0 ] || { echo 'scan requires a business, city, URL, or query' >&2; exit 2; }
+    query="$*"
+    slug="$(slugify "$query")"
+    run_dir="${WORKSPACE}/runs/${slug}"
+    mkdir -p "$run_dir"
+    python3 - "$query" "$run_dir" <<'PY'
+import json, sys
+from datetime import datetime, timezone
+query, run_dir = sys.argv[1:]
+now = datetime.now(timezone.utc).isoformat()
+data = {
+  'query': query,
+  'status': 'needs-research',
+  'observed_at': now,
+  'source_mode': 'initializer',
+  'signals': [],
+  'next_steps': ['Verify business identity and public sources', 'Check hours, services, booking path, and contact coverage', 'Add evidence before assigning an opportunity score']
+}
+with open(run_dir + '/scan.json', 'w', encoding='utf-8') as f: json.dump(data, f, indent=2)
+with open(run_dir + '/evidence.json', 'w', encoding='utf-8') as f: json.dump([], f, indent=2)
+with open(run_dir + '/opportunity-report.md', 'w', encoding='utf-8') as f:
+  f.write(f'# Opportunity report: {query}\n\nStatus: needs research\n\nThe scan initializer created this run. A research-capable agent must verify public evidence before making claims.\n')
+print(json.dumps({'run_dir': run_dir, 'scan_file': run_dir + '/scan.json', 'status': 'needs-research'}, indent=2))
+PY
+    ;;
+  validate-config)
+    [ "$#" -eq 2 ] || { echo 'validate-config requires a JSON path' >&2; exit 2; }
+    python3 - "$2" <<'PY'
+import json, sys
+path = sys.argv[1]
+with open(path, encoding='utf-8') as f: data = json.load(f)
+required = ['business_name','assistant_name','opening_line','services','hours','faqs','voice','urgent_call_policy','human_handoff']
+missing = [x for x in required if x not in data]
+if missing:
+  print(json.dumps({'valid': False, 'missing': missing}, indent=2)); sys.exit(1)
+print(json.dumps({'valid': True, 'business_name': data['business_name'], 'assistant_name': data['assistant_name']}, indent=2))
+PY
+    ;;
+  *) usage; exit 2 ;;
+esac
