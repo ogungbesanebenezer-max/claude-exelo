@@ -7,11 +7,13 @@ The React/Vite page in `src/` is an optional visual demo of the product concept.
 ## Install for Claude Code
 
 ```bash
-git clone YOUR_REPO_URL claude-exelo
+git clone https://github.com/ogungbesanebenezer-max/claude-exelo.git
 cd claude-exelo
 bash install.sh
 claude
 ```
+
+You do **not** need to enter your own repository URL. The command above clones the public Claude Exelo repository directly.
 
 Then run:
 
