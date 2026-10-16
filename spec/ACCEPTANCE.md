@@ -1,31 +1,36 @@
 # Acceptance criteria
 
-## Navigation
-- [ ] Clicking How it works, Pricing, FAQ, Profit calculator, and the closing CTA moves to the correct section.
-- [ ] Mobile menu opens, exposes the same links, and closes after a link is selected.
+## Installation and commands
 
-## Hero and demos
-- [ ] Hero shows the product promise, two CTAs, phone mockup, and four call outcome cards.
-- [ ] Portal demo shows metrics, recent activity, booking request, summary, and urgent alert context.
+- [ ] `bash install.sh` installs the Exelo hub skill, runtime helper, and specialist agents.
+- [ ] `bash -n install.sh uninstall.sh scripts/exelo` passes.
+- [ ] `/exelo doctor` reports crawler and Google Places readiness without exposing the API key.
+- [ ] `/exelo setup` creates `.exelo/config.json` and is safe to run again.
 
-## Workflow
-- [ ] Six workflow steps are visible.
-- [ ] Selecting a step changes the right-side preview without a page reload.
-- [ ] The selected step is visually distinct.
+## Website crawling
 
-## Calculator
-- [ ] Monthly price accepts values from 150 through 800 in increments of 10.
-- [ ] Monthly minutes accepts values from 250 through 1500 in increments of 25.
-- [ ] Price, usage cost, estimated margin, and margin percentage update immediately.
-- [ ] Usage cost is calculated at 0.30 per minute.
+- [ ] `/exelo crawl <URL>` stays on the supplied origin by default.
+- [ ] The crawl has a configurable page cap.
+- [ ] Output contains `website.json`, `scan.json`, `evidence.json`, and `opportunity-report.md`.
+- [ ] Extracted fields include title, description, headings, phones, emails, booking links, social links, and internal links.
+- [ ] Fetch failures are represented as structured results rather than hidden.
 
-## Pricing and FAQ
-- [ ] Starter, Growth, and Empire controls change the active pricing card.
-- [ ] Monthly and annual controls change billing display.
-- [ ] FAQ rows open and close and remain keyboard accessible.
+## Google Places
+
+- [ ] `/exelo maps <query>` uses `https://places.googleapis.com/v1/places:searchText` when `GOOGLE_MAPS_API_KEY` exists.
+- [ ] The request sends `X-Goog-FieldMask` and does not request unneeded fields.
+- [ ] Output preserves place ID, business name, address, website, rating, review count, status, type, and Maps URL when returned.
+- [ ] Missing API credentials produce `provider-not-configured` without fabricated business results.
+- [ ] API errors are surfaced with provider status and a safe error summary.
+
+## Evidence and agent behavior
+
+- [ ] Evidence records include claim, source, observed time, confidence, and verification.
+- [ ] Reports distinguish observed facts from estimates and unknowns.
+- [ ] The skill does not claim telephony, voice, billing, calendar, email, or live business operations.
 
 ## Quality
+
 - [ ] `npm run validate` passes.
 - [ ] `npm run build` passes.
-- [ ] No horizontal overflow is introduced at 375px viewport width.
-- [ ] No unhandled console errors appear during normal interaction.
+- [ ] No secrets are committed.

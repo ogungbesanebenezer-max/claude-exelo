@@ -1,37 +1,38 @@
 ---
 name: exelo
-description: "Exelo agent operations for local-business discovery, AI receptionist setup, proposals, pricing, testing, and deployment. Use when the user asks to run /exelo setup, /exelo doctor, /exelo scan, prospect a local business, create a proposal, configure an AI receptionist, test a line, or deploy a client line."
+description: "Agentic local-business research and sales-enablement workflows. Use when the user asks to run /exelo setup, /exelo doctor, /exelo scan, crawl a business website, search Google Maps or Places, score an opportunity, generate an evidence-backed report, or create a proposal from public business data."
 user-invocable: true
-argument-hint: "[setup|doctor|scan|prospect|proposal|configure|test-line|deploy] [business, city, URL, or options]"
+argument-hint: "[setup|doctor|scan|crawl|maps|score|report|proposal] [business, city, URL, or options]"
 ---
 
-# Exelo command hub
+# Exelo research command hub
 
-You are the Exelo orchestrator. The first argument selects the operation. Preserve the user's project context and write artifacts under `.exelo/` unless the user requests another location.
+Act as the Exelo research orchestrator. This is a portable agent skill for Claude Code and other coding agents. It researches public local-business opportunities; it is not a telephony, billing, calendar, voice, or email-delivery platform.
+
+Write artifacts under `.exelo/` unless the user requests another location. Keep the distinction between observed facts, estimates, inferences, and unknowns.
 
 ## Command dispatch
 
 ### `/exelo setup`
-Run the bundled doctor script first:
+Run:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/exelo" doctor
+"${CLAUDE_PLUGIN_ROOT}/scripts/exelo" setup
 ```
 
-Then create `.exelo/config.json` if it does not exist. Ask only for missing non-secret configuration. Never invent API keys. Use this shape:
+Create `.exelo/config.json` if it does not exist. Use this default shape:
 
 ```json
 {
   "version": 1,
   "workspace": ".exelo",
-  "businessDataProvider": "manual",
-  "telephonyProvider": "mock",
-  "emailProvider": "file",
-  "usageRate": 0.3
+  "crawler": { "provider": "built-in-fetch", "maxPages": 8, "sameOriginOnly": true },
+  "businessData": { "provider": "google-places", "configured": false },
+  "scoring": { "version": 1 }
 }
 ```
 
-Report which capabilities are real, mocked, or not configured. Setup must be safe to run repeatedly.
+Never invent or print API keys. Report whether Google Places is configured from `GOOGLE_MAPS_API_KEY`.
 
 ### `/exelo doctor`
 Run:
@@ -40,18 +41,22 @@ Run:
 "${CLAUDE_PLUGIN_ROOT}/scripts/exelo" doctor
 ```
 
-Report the JSON result in a readable table. Do not modify credentials or install remote dependencies during doctor checks.
+Report runtime, crawler, Google Places, workspace, and configuration status. Doctor must not make network calls or modify credentials.
 
 ### `/exelo scan <business, city, URL, or query>`
-Run the deterministic scan initializer:
+Run:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/exelo" scan <user arguments>
 ```
 
-Then perform the research needed to verify the business. For a URL, inspect only the supplied public URL unless the user authorizes broader crawling. For a business query, use the configured business-data connector if available; otherwise produce a clearly labeled research brief that identifies what still needs verification.
+The runtime performs the deterministic part:
 
-Save:
+- A URL is crawled with the built-in public website crawler.
+- A business/city query uses Google Places Text Search (New) when `GOOGLE_MAPS_API_KEY` is configured.
+- Without a key, it creates a clearly labeled provider-missing result instead of pretending to have live Maps data.
+
+Then inspect and enrich the results as an agent. Save:
 
 ```text
 .exelo/runs/<slug>/scan.json
@@ -59,34 +64,29 @@ Save:
 .exelo/runs/<slug>/opportunity-report.md
 ```
 
-Never present estimates as facts. Every claim should include a source, observed time, confidence, and verification note.
+Every evidence item must include `claim`, `source`, `observed_at`, `confidence`, and `verification`. Never present estimated missed calls, revenue, or pricing as facts.
 
-### `/exelo prospect <business>`
-Use the scan workflow, then score the opportunity using these signals: website availability, online booking, listed hours, review count, response speed, service urgency, and after-hours coverage. Save `prospect-score.json` and a prioritized next-action list.
+### `/exelo crawl <URL>`
+Crawl only the supplied public origin unless the user explicitly authorizes broader scope. Extract page titles, descriptions, headings, phone/email signals, hours, services, booking links, contact links, social links, robots directives, and internal links. Save the raw structured result and a compact evidence list.
 
-### `/exelo proposal <business>`
-Read the latest scan and prospect artifacts. Generate a client-facing Markdown proposal using the operator's brand name and price. Keep Exelo branding out of client-facing copy unless the user asks for co-branding. Include assumptions and mark every financial figure as an estimate.
+### `/exelo maps <query>`
+Use the Google Places adapter for public business discovery. Prefer fields needed for research: place ID, display name, formatted address, national phone number, website URI, rating, user rating count, business status, primary type, and Google Maps URI. Respect Google API terms and configured quotas. Do not scrape the consumer Google Maps UI.
 
-### `/exelo configure <business>`
-Generate or update `.exelo/businesses/<slug>/receptionist.json` with assistant name, opening line, services, hours, FAQs, voice, urgent-call policy, and human handoff. Validate it with:
+### `/exelo score <run-or-business>`
+Score only from evidence. Use signals such as website presence, online booking, listed hours, review count, contact clarity, service urgency, and evidence of lead friction. Return a transparent score with per-signal rationale and confidence, not a fabricated precision metric.
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/exelo" validate-config .exelo/businesses/<slug>/receptionist.json
-```
+### `/exelo report <run-or-business>`
+Generate an opportunity report for a business owner or operator. Separate observed facts, interpretation, estimated opportunity, limitations, and recommended next actions.
 
-Do not claim the phone line is live unless a telephony connector confirms activation.
-
-### `/exelo test-line <business>`
-If telephony is mocked, run a local conversation simulation and save the transcript. If a real telephony connector exists, test only the configured line and summarize the result. Never place calls or change a live line without explicit user authorization.
-
-### `/exelo deploy <business>`
-Check configuration, proposal, and test artifacts. If production integrations are absent, produce a deployment plan and stop at the boundary. If integrations are configured, show the exact resources to be created and require confirmation before provisioning, billing, changing ownership, or activating a live phone line.
+### `/exelo proposal <run-or-business>`
+Read the latest verified scan and score. Generate a client-facing Markdown proposal using the operator's brand and chosen price. Include source-backed findings and mark all financial figures as estimates. Do not claim an AI receptionist, phone line, bookings, or any other operational service is live.
 
 ## Operating rules
 
-- Use specialist agents for research, scoring, proposal writing, receptionist configuration, and QA when available.
-- Use deterministic scripts for calculations, validation, slugs, and file generation.
-- Keep source evidence with every business claim.
-- Treat telephony, billing, email, calendar, and business-data integrations as adapters.
-- Clearly distinguish `mock`, `configured`, `verified`, and `live` states.
-- Do not scrape or access private data without authorization.
+- Use specialist agents for website crawling review, Maps research, evidence synthesis, scoring, and proposal writing.
+- Use deterministic scripts for HTTP fetching, extraction, JSON schemas, slugs, and calculations.
+- Crawl public pages politely, stay same-origin by default, cap pages, identify the tool, and avoid private/authenticated areas.
+- Keep raw observations separate from agent interpretation.
+- Prefer Google Places API responses over search snippets when configured.
+- Do not access private data, bypass robots/authentication, or scrape the Google Maps consumer interface.
+- This skill generates research and sales-enablement artifacts. It does not provision or operate telephony, email, calendar, payments, or live business systems.

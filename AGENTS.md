@@ -1,32 +1,26 @@
 # AGENTS.md
 
 ## Mission
-Build and maintain the Exelo-style AI receptionist operating system landing experience in this repository. Keep the page functional, responsive, accessible, and data-driven.
+Build and maintain a portable agentic research and sales-enablement skill for Claude Code and other coding agents. The core system discovers local businesses, crawls public websites, queries Google Places, preserves evidence, scores opportunity signals, and generates reports and proposals.
 
 ## Start here
-1. Read `README.md`.
-2. Read `spec/PRODUCT_SPEC.md`, `spec/UI_SPEC.md`, and `spec/ACCEPTANCE.md`.
-3. Inspect `src/main.jsx` and `src/styles.css` before changing architecture.
-4. Run `npm install`, `npm run validate`, and `npm run build`.
+Read `README.md`, `skills/exelo/SKILL.md`, `spec/PRODUCT_SPEC.md`, `spec/ACCEPTANCE.md`, and `CLAUDE.md`. Run `npm run validate` and `bash -n install.sh uninstall.sh scripts/exelo` before changing runtime behavior.
 
 ## Implementation rules
-- Use React and keep all UI state local unless a backend is explicitly requested.
-- Keep product copy, workflow data, plans, and FAQ content outside presentation components where practical.
-- Preserve the existing section IDs: `top`, `how`, `calculator`, `pricing`, `faq`, and `close`.
-- Preserve keyboard access for buttons, range inputs, navigation, and FAQ disclosure elements.
-- Use native `<details>`/`<summary>` for FAQ behavior unless a product requirement needs a custom accordion.
-- Keep the workflow preview driven by the active step; do not duplicate six independent page layouts.
-- Keep pricing and calculator values derived from state rather than hard-coded output text.
-- Treat the current design as a visual reference, not as permission to copy private source code or proprietary production assets.
+- Keep command orchestration in `skills/exelo/SKILL.md`.
+- Keep deterministic work in `scripts/`: URL fetching, same-origin crawling, extraction, Google Places requests, slugs, schemas, and file output.
+- Keep research judgment in specialist files under `agents/`.
+- Keep observations separate from interpretations. Every evidence record needs claim, value, source, observed_at, confidence, and verification.
+- Use public HTTP sources only. Stay same-origin by default, cap crawl pages, identify the crawler, and do not bypass robots, authentication, paywalls, or rate limits.
+- Use Google Places API (New), not consumer Google Maps UI scraping.
+- Never invent a provider result when an API key is missing or a request fails.
+- Preserve the distinction between observed, estimated, inferred, unknown, and provider-not-configured.
+- The `src/` Vite app is an optional visual demo; it is not the runtime engine.
 
 ## Definition of done
-- `npm run validate` passes.
-- `npm run build` passes.
-- Header anchors work.
-- Mobile navigation opens and closes.
-- Workflow steps change the preview.
-- Both calculator sliders update outputs.
-- Plan and billing controls update pricing.
-- FAQ items open and close.
-- Layout works at desktop and mobile widths.
-- No console errors are introduced.
+- `/exelo doctor` reports crawler and Google Places readiness without exposing secrets.
+- `/exelo setup` is idempotent.
+- `/exelo crawl <URL>` creates structured website, scan, evidence, and report artifacts.
+- `/exelo maps <query>` uses Google Places when configured and returns an explicit missing-provider state otherwise.
+- `npm run validate` and `npm run build` pass.
+- No runtime feature claims telephony, voice, email, calendar, billing, phone provisioning, or live business operations.

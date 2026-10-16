@@ -6,11 +6,14 @@ WORKSPACE="${EXELO_WORKSPACE:-.exelo}"
 
 usage() {
   cat <<'EOF'
-Exelo runtime helper
+Exelo research runtime
 
 Usage:
+  exelo setup
   exelo doctor
-  exelo scan <business, city, URL, or query>
+  exelo scan <URL or business/city query>
+  exelo crawl <URL>
+  exelo maps <business/city query>
   exelo validate-config <path>
 EOF
 }
@@ -20,6 +23,31 @@ slugify() {
 }
 
 case "${1:-}" in
+  setup)
+    mkdir -p "$WORKSPACE"
+    if [ ! -f "$WORKSPACE/config.json" ]; then
+      cat > "$WORKSPACE/config.json" <<'JSON'
+{
+  "version": 1,
+  "workspace": ".exelo",
+  "crawler": { "provider": "built-in-fetch", "maxPages": 8, "sameOriginOnly": true },
+  "businessData": { "provider": "google-places", "configured": false },
+  "scoring": { "version": 1 }
+}
+JSON
+      created=true
+    else
+      created=false
+    fi
+    python3 - "$WORKSPACE/config.json" "$created" <<'PY'
+import json, os, sys
+path, created = sys.argv[1:]
+with open(path, encoding='utf-8') as f: cfg = json.load(f)
+cfg.setdefault('businessData', {})['configured'] = bool(os.environ.get('GOOGLE_MAPS_API_KEY'))
+with open(path, 'w', encoding='utf-8') as f: json.dump(cfg, f, indent=2); f.write('\n')
+print(json.dumps({'config': path, 'created': created == 'True', 'google_places_configured': bool(os.environ.get('GOOGLE_MAPS_API_KEY'))}, indent=2))
+PY
+    ;;
   doctor)
     python3 - "$ROOT_DIR" "$WORKSPACE" <<'PY'
 import json, os, shutil, sys
@@ -27,61 +55,49 @@ root, workspace = sys.argv[1:]
 config_path = os.path.join(workspace, 'config.json')
 result = {
   'runtime': {'python': shutil.which('python3') is not None, 'node': shutil.which('node') is not None, 'git': shutil.which('git') is not None},
-  'root': os.path.abspath(root),
-  'workspace': os.path.abspath(workspace),
-  'workspace_exists': os.path.isdir(workspace),
-  'config_exists': os.path.isfile(config_path),
-  'config_valid': False,
-  'providers': {'businessData': 'manual', 'telephony': 'mock', 'email': 'file'}
+  'crawler': {'provider': 'built-in-fetch', 'available': shutil.which('node') is not None},
+  'business_data': {'provider': 'google-places', 'api_key_configured': bool(os.environ.get('GOOGLE_MAPS_API_KEY'))},
+  'root': os.path.abspath(root), 'workspace': os.path.abspath(workspace),
+  'workspace_exists': os.path.isdir(workspace), 'config_exists': os.path.isfile(config_path), 'config_valid': False
 }
 if result['config_exists']:
   try:
     with open(config_path, encoding='utf-8') as f: cfg = json.load(f)
     result['config_valid'] = isinstance(cfg, dict) and cfg.get('version') == 1
-    if isinstance(cfg, dict): result['providers'].update({k: cfg[k] for k in ('businessDataProvider','telephonyProvider','emailProvider') if k in cfg})
-  except Exception as exc:
-    result['config_error'] = str(exc)
+  except Exception as exc: result['config_error'] = str(exc)
 print(json.dumps(result, indent=2))
 PY
     ;;
   scan)
     shift
-    [ "$#" -gt 0 ] || { echo 'scan requires a business, city, URL, or query' >&2; exit 2; }
-    query="$*"
-    slug="$(slugify "$query")"
-    run_dir="${WORKSPACE}/runs/${slug}"
-    mkdir -p "$run_dir"
-    python3 - "$query" "$run_dir" <<'PY'
-import json, sys
-from datetime import datetime, timezone
-query, run_dir = sys.argv[1:]
-now = datetime.now(timezone.utc).isoformat()
-data = {
-  'query': query,
-  'status': 'needs-research',
-  'observed_at': now,
-  'source_mode': 'initializer',
-  'signals': [],
-  'next_steps': ['Verify business identity and public sources', 'Check hours, services, booking path, and contact coverage', 'Add evidence before assigning an opportunity score']
-}
-with open(run_dir + '/scan.json', 'w', encoding='utf-8') as f: json.dump(data, f, indent=2)
-with open(run_dir + '/evidence.json', 'w', encoding='utf-8') as f: json.dump([], f, indent=2)
-with open(run_dir + '/opportunity-report.md', 'w', encoding='utf-8') as f:
-  f.write(f'# Opportunity report: {query}\n\nStatus: needs research\n\nThe scan initializer created this run. A research-capable agent must verify public evidence before making claims.\n')
-print(json.dumps({'run_dir': run_dir, 'scan_file': run_dir + '/scan.json', 'status': 'needs-research'}, indent=2))
-PY
+    [ "$#" -gt 0 ] || { echo 'scan requires a URL or business/city query' >&2; exit 2; }
+    query="$*"; slug="$(slugify "$query")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"
+    if printf '%s' "$query" | grep -Eq '^https?://'; then
+      node "$ROOT_DIR/scripts/crawl.mjs" "$query" "$run_dir"
+    else
+      node "$ROOT_DIR/scripts/google-places.mjs" "$query" "$run_dir"
+    fi
+    ;;
+  crawl)
+    [ "$#" -eq 2 ] || { echo 'crawl requires exactly one URL' >&2; exit 2; }
+    slug="$(slugify "$2")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"
+    node "$ROOT_DIR/scripts/crawl.mjs" "$2" "$run_dir"
+    ;;
+  maps)
+    shift
+    [ "$#" -gt 0 ] || { echo 'maps requires a business/city query' >&2; exit 2; }
+    query="$*"; slug="$(slugify "$query")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"
+    node "$ROOT_DIR/scripts/google-places.mjs" "$query" "$run_dir"
     ;;
   validate-config)
     [ "$#" -eq 2 ] || { echo 'validate-config requires a JSON path' >&2; exit 2; }
     python3 - "$2" <<'PY'
 import json, sys
-path = sys.argv[1]
-with open(path, encoding='utf-8') as f: data = json.load(f)
-required = ['business_name','assistant_name','opening_line','services','hours','faqs','voice','urgent_call_policy','human_handoff']
+with open(sys.argv[1], encoding='utf-8') as f: data = json.load(f)
+required = ['version', 'crawler', 'businessData', 'scoring']
 missing = [x for x in required if x not in data]
-if missing:
-  print(json.dumps({'valid': False, 'missing': missing}, indent=2)); sys.exit(1)
-print(json.dumps({'valid': True, 'business_name': data['business_name'], 'assistant_name': data['assistant_name']}, indent=2))
+if missing: print(json.dumps({'valid': False, 'missing': missing}, indent=2)); sys.exit(1)
+print(json.dumps({'valid': True, 'version': data['version']}, indent=2))
 PY
     ;;
   *) usage; exit 2 ;;

@@ -1,17 +1,17 @@
 {
-  "brand": "Exelo",
-  "calculator": {
-    "price": { "min": 150, "max": 800, "step": 10, "default": 350 },
-    "minutes": { "min": 250, "max": 1500, "step": 25, "default": 500 },
-    "usageRate": 0.3
+  "product": "exelo-agentic-research",
+  "providers": {
+    "crawler": "built-in-fetch",
+    "businessData": "google-places"
   },
-  "workflow": [
-    { "id": "find", "number": "01", "title": "Find a business" },
-    { "id": "need", "number": "02", "title": "Show the need" },
-    { "id": "proposal", "number": "03", "title": "Build the proposal" },
-    { "id": "customize", "number": "04", "title": "Customize the AI" },
-    { "id": "price", "number": "05", "title": "Set your price" },
-    { "id": "live", "number": "06", "title": "Go live" }
-  ],
-  "plans": ["Starter", "Growth", "Empire"]
+  "crawler": {
+    "maxPages": 8,
+    "sameOriginOnly": true,
+    "userAgent": "ExeloResearchBot/0.1"
+  },
+  "googlePlaces": {
+    "endpoint": "https://places.googleapis.com/v1/places:searchText",
+    "requiredEnv": "GOOGLE_MAPS_API_KEY",
+    "fieldMask": ["places.id", "places.displayName", "places.formattedAddress", "places.nationalPhoneNumber", "places.websiteUri", "places.rating", "places.userRatingCount", "places.businessStatus", "places.primaryType", "places.googleMapsUri"]
+  }
 }
