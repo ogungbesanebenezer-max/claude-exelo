@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Exelo Agent Kit installer
+# Claude Exelo installer
 # Installs the user-invocable /exelo hub skill and bundled specialist agents.
 
 main() {

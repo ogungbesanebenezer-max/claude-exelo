@@ -1,4 +1,4 @@
-# Exelo Agent Kit
+# Claude Exelo
 
 An installable, portable agent skill for Claude Code and other coding agents. It discovers local businesses, crawls public websites, queries Google Places, preserves evidence, scores opportunity signals, and generates research reports and proposals.
 
@@ -7,8 +7,8 @@ The React/Vite page in `src/` is an optional visual demo of the product concept.
 ## Install for Claude Code
 
 ```bash
-git clone YOUR_REPO_URL exelo-agent-kit
-cd exelo-agent-kit
+git clone YOUR_REPO_URL claude-exelo
+cd claude-exelo
 bash install.sh
 claude
 ```

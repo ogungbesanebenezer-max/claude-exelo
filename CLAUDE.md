@@ -1,4 +1,4 @@
-# Exelo Agent Kit
+# Claude Exelo
 
 Treat `skills/exelo/SKILL.md` as the command contract for `/exelo`. Keep deterministic operations in `scripts/` and delegated research judgment in `agents/`. The product scope is public local-business research: built-in website crawling, Google Places discovery, evidence preservation, opportunity scoring, reporting, and proposals.
 
