@@ -1,8 +1,6 @@
 # Claude Exelo
 
-An installable, portable agent skill for Claude Code and other coding agents. It discovers local businesses, crawls public websites, queries Google Places, preserves evidence, scores opportunity signals, and generates research reports and proposals.
-
-The React/Vite page in `src/` is an optional visual demo of the product concept. The core deliverable is the agent system under `skills/`, `agents/`, `scripts/`, and `.claude-plugin/`.
+An installable, portable agent skill for Claude Code and other coding agents. It discovers local businesses with OpenStreetMap, crawls public websites with a local headless Chromium browser, preserves evidence, scores opportunity signals, and generates research reports and proposals.
 
 ## Install for Claude Code
 
@@ -13,7 +11,7 @@ bash install.sh
 claude
 ```
 
-You do **not** need to enter your own repository URL. The command above clones the public Claude Exelo repository directly.
+`install.sh` installs the skill, specialist agents, Node dependencies, and the Playwright Chromium browser. No paid API key is required for the default workflow.
 
 Then run:
 
@@ -22,27 +20,33 @@ Then run:
 /exelo setup
 /exelo scan "dentists in San Diego"
 /exelo crawl https://example-business.com
-/exelo maps "dentists in San Diego"
+/exelo osm "dentists in San Diego"
 /exelo score .exelo/runs/<slug>
 /exelo report .exelo/runs/<slug>
 /exelo proposal .exelo/runs/<slug>
 ```
 
-The installer places the hub at `~/.claude/skills/exelo/SKILL.md`, the runtime at `~/.claude/skills/exelo/scripts/exelo`, and specialist agents in `~/.claude/agents/`. Set `EXELO_FORCE=1` to replace an existing install. Use `bash uninstall.sh` to remove the manual install.
+## Local crawling
 
-## Providers
+The crawler runs Chromium locally through Playwright. It renders JavaScript, extracts the readable main content with `@mozilla/readability`, and converts it to clean Markdown with Turndown. It also records titles, descriptions, headings, phone and email signals, hours language, services, booking links, social links, and internal links.
 
-The website crawler is built in and uses public HTTP fetches with same-origin and page-count limits. It extracts titles, descriptions, headings, phone and email signals, hours language, services, booking links, social links, and internal links.
+The crawler stays on the supplied origin by default, limits the number of pages, identifies itself, and does not access private or authenticated areas. Configure the limits with `EXELO_MAX_PAGES`, `EXELO_PAGE_TIMEOUT`, and `EXELO_SETTLE_MS`.
 
-Google business discovery uses the Google Places API (New) Text Search endpoint when `GOOGLE_MAPS_API_KEY` is configured. The adapter requests place ID, name, address, phone, website, rating, review count, business status, type, and Maps URL. Without a key, it returns an explicit `provider-not-configured` result and makes no business claims.
+## OpenStreetMap discovery
+
+Use a query such as:
 
 ```bash
-export GOOGLE_MAPS_API_KEY="your-key"
-/exelo setup
-/exelo maps "dentists in San Diego"
+/exelo osm "dentists in San Diego"
 ```
 
-Enable Places API (New) and billing in the Google Cloud project that owns the key. The repo does not scrape the consumer Google Maps UI.
+Claude Exelo geocodes the location with Nominatim and queries the Overpass API for nearby OpenStreetMap nodes, ways, and relations. Results include OSM IDs, names, addresses, websites, phones, opening hours, coordinates, and OSM URLs. OSM is community-maintained discovery data, so the agent must crawl and verify each website before presenting current business claims. Research exports should retain `© OpenStreetMap contributors` attribution.
+
+## Business-opportunity scoring
+
+`/exelo score <run-dir>` writes `score.json`. The deterministic baseline scores four dimensions: business fit, market proof, conversion friction, and website quality. Every signal exposes points, maximum points, status, rationale, and confidence.
+
+The score is a triage aid, not a prediction of revenue, rankings, missed calls, or conversion. A missing booking link is marked `not-observed` and becomes a verification task; it is not silently treated as proof that no booking exists. Unknown signals lower confidence.
 
 ## Outputs
 
@@ -50,17 +54,17 @@ Each run is stored under `.exelo/runs/<slug>/`:
 
 ```text
 scan.json
-maps.json or website.json
+osm.json or website.json
 evidence.json
+score.json
 opportunity-report.md
 ```
-
-Agents should enrich these artifacts with source URLs, observation times, confidence, verification notes, opportunity rationale, and limitations.
 
 ## Validate locally
 
 ```bash
 npm install
+npx playwright install chromium
 npm run validate
 npm run build
 bash -n install.sh uninstall.sh scripts/exelo
@@ -68,4 +72,4 @@ bash -n install.sh uninstall.sh scripts/exelo
 
 ## Scope boundary
 
-This repo is a research and sales-enablement skill. It does not provision or operate telephony, voice, email delivery, calendars, billing, phone numbers, or live business systems.
+This repo is a public research and sales-enablement skill. It does not provision or operate telephony, voice, email delivery, calendars, billing, phone numbers, or live business systems.

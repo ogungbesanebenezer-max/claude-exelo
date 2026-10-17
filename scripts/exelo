@@ -1,27 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKSPACE="${EXELO_WORKSPACE:-.exelo}"
-
-usage() {
-  cat <<'EOF'
-Exelo research runtime
+usage() { cat <<'EOF'
+Claude Exelo research runtime
 
 Usage:
   exelo setup
   exelo doctor
   exelo scan <URL or business/city query>
   exelo crawl <URL>
-  exelo maps <business/city query>
+  exelo osm <business/city query>
+  exelo score <run-dir>
   exelo validate-config <path>
 EOF
 }
-
-slugify() {
-  printf '%s' "$*" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
-}
-
+slugify() { printf '%s' "$*" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'; }
 case "${1:-}" in
   setup)
     mkdir -p "$WORKSPACE"
@@ -30,22 +24,19 @@ case "${1:-}" in
 {
   "version": 1,
   "workspace": ".exelo",
-  "crawler": { "provider": "built-in-fetch", "maxPages": 8, "sameOriginOnly": true },
-  "businessData": { "provider": "google-places", "configured": false },
+  "crawler": { "provider": "local-playwright", "maxPages": 8, "sameOriginOnly": true },
+  "businessData": { "provider": "openstreetmap-overpass" },
   "scoring": { "version": 1 }
 }
 JSON
       created=true
-    else
-      created=false
-    fi
-    python3 - "$WORKSPACE/config.json" "$created" <<'PY'
-import json, os, sys
-path, created = sys.argv[1:]
+    else created=false; fi
+    python3 - "$WORKSPACE/config.json" "$created" "$ROOT_DIR" <<'PY'
+import json, os, shutil, sys
+path, created, root = sys.argv[1:]
 with open(path, encoding='utf-8') as f: cfg = json.load(f)
-cfg.setdefault('businessData', {})['configured'] = bool(os.environ.get('GOOGLE_MAPS_API_KEY'))
 with open(path, 'w', encoding='utf-8') as f: json.dump(cfg, f, indent=2); f.write('\n')
-print(json.dumps({'config': path, 'created': created == 'True', 'google_places_configured': bool(os.environ.get('GOOGLE_MAPS_API_KEY'))}, indent=2))
+print(json.dumps({'config': path, 'created': created == 'True', 'node': bool(shutil.which('node')), 'playwright_package': os.path.isdir(os.path.join(root, 'node_modules', 'playwright')), 'overpass': 'https://overpass-api.de/api/interpreter', 'scoring': os.path.isfile(os.path.join(root, 'scripts', 'score.mjs'))}, indent=2))
 PY
     ;;
   doctor)
@@ -53,41 +44,36 @@ PY
 import json, os, shutil, sys
 root, workspace = sys.argv[1:]
 config_path = os.path.join(workspace, 'config.json')
-result = {
-  'runtime': {'python': shutil.which('python3') is not None, 'node': shutil.which('node') is not None, 'git': shutil.which('git') is not None},
-  'crawler': {'provider': 'built-in-fetch', 'available': shutil.which('node') is not None},
-  'business_data': {'provider': 'google-places', 'api_key_configured': bool(os.environ.get('GOOGLE_MAPS_API_KEY'))},
-  'root': os.path.abspath(root), 'workspace': os.path.abspath(workspace),
-  'workspace_exists': os.path.isdir(workspace), 'config_exists': os.path.isfile(config_path), 'config_valid': False
-}
+chromium = False
+try:
+  from pathlib import Path
+  cache = Path.home()/'.cache/ms-playwright'
+  chromium = cache.exists() and (any(cache.glob('chromium-*/chrome-linux/chrome')) or any(cache.glob('chromium-*/chrome-linux64/chrome')))
+except Exception: pass
+result = {'runtime': {'python': bool(shutil.which('python3')), 'node': bool(shutil.which('node')), 'git': bool(shutil.which('git'))}, 'crawler': {'provider': 'local-playwright', 'playwright_package': os.path.isdir(os.path.join(root, 'node_modules', 'playwright')), 'chromium_installed': chromium, 'parser': '@mozilla/readability+turndown'}, 'business_data': {'provider': 'openstreetmap-overpass', 'geocoder': 'nominatim', 'endpoint': 'https://overpass-api.de/api/interpreter'}, 'scoring': {'available': os.path.isfile(os.path.join(root, 'scripts', 'score.mjs'))}, 'workspace': os.path.abspath(workspace), 'workspace_exists': os.path.isdir(workspace), 'config_exists': os.path.isfile(config_path), 'config_valid': False}
 if result['config_exists']:
   try:
-    with open(config_path, encoding='utf-8') as f: cfg = json.load(f)
-    result['config_valid'] = isinstance(cfg, dict) and cfg.get('version') == 1
+    with open(config_path, encoding='utf-8') as f: result['config_valid'] = json.load(f).get('version') == 1
   except Exception as exc: result['config_error'] = str(exc)
 print(json.dumps(result, indent=2))
 PY
     ;;
   scan)
-    shift
-    [ "$#" -gt 0 ] || { echo 'scan requires a URL or business/city query' >&2; exit 2; }
+    shift; [ "$#" -gt 0 ] || { echo 'scan requires a URL or business/city query' >&2; exit 2; }
     query="$*"; slug="$(slugify "$query")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"
-    if printf '%s' "$query" | grep -Eq '^https?://'; then
-      node "$ROOT_DIR/scripts/crawl.mjs" "$query" "$run_dir"
-    else
-      node "$ROOT_DIR/scripts/google-places.mjs" "$query" "$run_dir"
-    fi
+    if printf '%s' "$query" | grep -Eq '^https?://'; then node "$ROOT_DIR/scripts/crawl.mjs" "$query" "$run_dir"; else node "$ROOT_DIR/scripts/overpass.mjs" "$query" "$run_dir"; fi
     ;;
   crawl)
     [ "$#" -eq 2 ] || { echo 'crawl requires exactly one URL' >&2; exit 2; }
-    slug="$(slugify "$2")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"
-    node "$ROOT_DIR/scripts/crawl.mjs" "$2" "$run_dir"
+    slug="$(slugify "$2")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"; node "$ROOT_DIR/scripts/crawl.mjs" "$2" "$run_dir"
     ;;
-  maps)
-    shift
-    [ "$#" -gt 0 ] || { echo 'maps requires a business/city query' >&2; exit 2; }
-    query="$*"; slug="$(slugify "$query")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"
-    node "$ROOT_DIR/scripts/google-places.mjs" "$query" "$run_dir"
+  osm|maps)
+    shift; [ "$#" -gt 0 ] || { echo 'osm requires a business/city query' >&2; exit 2; }
+    query="$*"; slug="$(slugify "$query")"; run_dir="${WORKSPACE}/runs/${slug}"; mkdir -p "$run_dir"; node "$ROOT_DIR/scripts/overpass.mjs" "$query" "$run_dir"
+    ;;
+  score)
+    [ "$#" -eq 2 ] || { echo 'score requires a run directory' >&2; exit 2; }
+    node "$ROOT_DIR/scripts/score.mjs" "$2"
     ;;
   validate-config)
     [ "$#" -eq 2 ] || { echo 'validate-config requires a JSON path' >&2; exit 2; }

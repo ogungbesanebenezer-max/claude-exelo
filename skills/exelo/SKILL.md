@@ -1,15 +1,15 @@
 ---
 name: exelo
-description: "Agentic local-business research and sales-enablement workflows. Use when the user asks to run /exelo setup, /exelo doctor, /exelo scan, crawl a business website, search Google Maps or Places, score an opportunity, generate an evidence-backed report, or create a proposal from public business data."
+description: "Agentic local-business research and sales-enablement workflows. Use for /exelo setup, /exelo doctor, /exelo scan, local Playwright website crawling, OpenStreetMap/Overpass business discovery, opportunity scoring, evidence-backed reports, and proposals."
 user-invocable: true
-argument-hint: "[setup|doctor|scan|crawl|maps|score|report|proposal] [business, city, URL, or options]"
+argument-hint: "[setup|doctor|scan|crawl|osm|score|report|proposal] [business, city, URL, or options]"
 ---
 
-# Exelo research command hub
+# Claude Exelo research command hub
 
-Act as the Exelo research orchestrator. This is a portable agent skill for Claude Code and other coding agents. It researches public local-business opportunities; it is not a telephony, billing, calendar, voice, or email-delivery platform.
+Act as the Exelo research orchestrator. This is a portable agent skill for Claude Code and other coding agents. It researches public local-business opportunities. It does not operate telephony, email, calendars, billing, or live business systems.
 
-Write artifacts under `.exelo/` unless the user requests another location. Keep the distinction between observed facts, estimates, inferences, and unknowns.
+The default stack is local and open source: Playwright launches Chromium on the user's machine, Mozilla Readability extracts the main content, and Turndown converts it into clean Markdown. OpenStreetMap discovery uses Nominatim for geocoding and Overpass API for nearby business records.
 
 ## Command dispatch
 
@@ -20,73 +20,40 @@ Run:
 "${CLAUDE_PLUGIN_ROOT}/scripts/exelo" setup
 ```
 
-Create `.exelo/config.json` if it does not exist. Use this default shape:
-
-```json
-{
-  "version": 1,
-  "workspace": ".exelo",
-  "crawler": { "provider": "built-in-fetch", "maxPages": 8, "sameOriginOnly": true },
-  "businessData": { "provider": "google-places", "configured": false },
-  "scoring": { "version": 1 }
-}
-```
-
-Never invent or print API keys. Report whether Google Places is configured from `GOOGLE_MAPS_API_KEY`.
+Create `.exelo/config.json` if missing. Report whether Node, Playwright, the Chromium executable, Overpass, and the scoring engine are available. Never ask for API keys.
 
 ### `/exelo doctor`
-Run:
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/exelo" doctor
-```
-
-Report runtime, crawler, Google Places, workspace, and configuration status. Doctor must not make network calls or modify credentials.
+Run the doctor command and report runtime, local browser, OpenStreetMap/Overpass, scoring, workspace, and configuration status. Do not make network calls during doctor checks.
 
 ### `/exelo scan <business, city, URL, or query>`
+Run the deterministic scan. A URL is crawled with local Playwright. A business/city query uses OpenStreetMap/Overpass. Then enrich the results as an agent and save `scan.json`, `evidence.json`, and `opportunity-report.md` under `.exelo/runs/<slug>/`.
+
+### `/exelo crawl <URL>`
+Use local Playwright to render the public page. Stay same-origin by default and cap pages. Use Readability and Turndown to save agent-readable Markdown alongside structured page fields: title, description, headings, phone, email, hours, services, booking links, social links, and internal links.
+
+### `/exelo osm <query>`
+Use a query such as `dentists in San Diego`. Nominatim resolves the location, and Overpass returns nearby OSM nodes, ways, and relations tagged with the mapped business type. Preserve the OSM URL, coordinates, tags, and the fact that the data is community-maintained. Crawl each returned website before treating it as current.
+
+### `/exelo score <run-dir>`
 Run:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/exelo" scan <user arguments>
+"${CLAUDE_PLUGIN_ROOT}/scripts/exelo" score <run-dir>
 ```
 
-The runtime performs the deterministic part:
+The score is evidence-weighted opportunity triage across fit, market proof, conversion friction, and website quality. It is not a prediction of revenue, rankings, or conversion. Review every signal and its confidence before presenting it.
 
-- A URL is crawled with the built-in public website crawler.
-- A business/city query uses Google Places Text Search (New) when `GOOGLE_MAPS_API_KEY` is configured.
-- Without a key, it creates a clearly labeled provider-missing result instead of pretending to have live Maps data.
+### `/exelo report <run-dir>`
+Read the scan and score artifacts. Separate observed facts, interpretation, estimated opportunity, unknowns, limitations, and next verification actions.
 
-Then inspect and enrich the results as an agent. Save:
-
-```text
-.exelo/runs/<slug>/scan.json
-.exelo/runs/<slug>/evidence.json
-.exelo/runs/<slug>/opportunity-report.md
-```
-
-Every evidence item must include `claim`, `source`, `observed_at`, `confidence`, and `verification`. Never present estimated missed calls, revenue, or pricing as facts.
-
-### `/exelo crawl <URL>`
-Crawl only the supplied public origin unless the user explicitly authorizes broader scope. Extract page titles, descriptions, headings, phone/email signals, hours, services, booking links, contact links, social links, robots directives, and internal links. Save the raw structured result and a compact evidence list.
-
-### `/exelo maps <query>`
-Use the Google Places adapter for public business discovery. Prefer fields needed for research: place ID, display name, formatted address, national phone number, website URI, rating, user rating count, business status, primary type, and Google Maps URI. Respect Google API terms and configured quotas. Do not scrape the consumer Google Maps UI.
-
-### `/exelo score <run-or-business>`
-Score only from evidence. Use signals such as website presence, online booking, listed hours, review count, contact clarity, service urgency, and evidence of lead friction. Return a transparent score with per-signal rationale and confidence, not a fabricated precision metric.
-
-### `/exelo report <run-or-business>`
-Generate an opportunity report for a business owner or operator. Separate observed facts, interpretation, estimated opportunity, limitations, and recommended next actions.
-
-### `/exelo proposal <run-or-business>`
-Read the latest verified scan and score. Generate a client-facing Markdown proposal using the operator's brand and chosen price. Include source-backed findings and mark all financial figures as estimates. Do not claim an AI receptionist, phone line, bookings, or any other operational service is live.
+### `/exelo proposal <run-dir>`
+Generate a client-facing Markdown proposal using only verified findings. Mark any price, ROI, or opportunity value as an estimate with assumptions.
 
 ## Operating rules
 
-- Use specialist agents for website crawling review, Maps research, evidence synthesis, scoring, and proposal writing.
-- Use deterministic scripts for HTTP fetching, extraction, JSON schemas, slugs, and calculations.
-- Crawl public pages politely, stay same-origin by default, cap pages, identify the tool, and avoid private/authenticated areas.
+- Use deterministic scripts for browser automation, content extraction, OSM requests, scoring, schemas, slugs, and file output.
+- Use specialist agents for source review, OSM research, evidence synthesis, scoring review, reporting, and proposal writing.
+- Crawl public pages politely and do not bypass authentication, paywalls, robots restrictions, or access controls.
+- Treat OSM records as discovery leads, not guaranteed current business facts.
 - Keep raw observations separate from agent interpretation.
-- Prefer Google Places API responses over search snippets when configured.
-- Do not access private data, bypass robots/authentication, or scrape the Google Maps consumer interface.
-- This skill generates research and sales-enablement artifacts. It does not provision or operate telephony, email, calendar, payments, or live business systems.
+- Never present missing data as a factual absence without a defensible verification method.

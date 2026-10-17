@@ -1,20 +1,26 @@
 {
   "name": "claude-exelo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "validate": "node scripts/validate-content.mjs"
+    "validate": "node scripts/validate-content.mjs",
+    "crawl": "node scripts/crawl.mjs",
+    "score": "node scripts/score.mjs"
   },
   "dependencies": {
+    "@mozilla/readability": "latest",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
+    "jsdom": "^26.1.0",
+    "playwright": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "turndown": "latest",
+    "typescript": "latest",
+    "vite": "latest"
   },
   "devDependencies": {}
 }

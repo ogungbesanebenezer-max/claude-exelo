@@ -1,17 +1,26 @@
 {
-  "product": "exelo-agentic-research",
+  "product": "claude-exelo",
   "providers": {
-    "crawler": "built-in-fetch",
-    "businessData": "google-places"
+    "crawler": "local-playwright",
+    "contentParser": "@mozilla/readability+turndown",
+    "businessData": "openstreetmap-overpass"
   },
   "crawler": {
+    "browser": "chromium",
     "maxPages": 8,
     "sameOriginOnly": true,
-    "userAgent": "ExeloResearchBot/0.1"
+    "userAgent": "ClaudeExeloResearchBot/0.1"
   },
-  "googlePlaces": {
-    "endpoint": "https://places.googleapis.com/v1/places:searchText",
-    "requiredEnv": "GOOGLE_MAPS_API_KEY",
-    "fieldMask": ["places.id", "places.displayName", "places.formattedAddress", "places.nationalPhoneNumber", "places.websiteUri", "places.rating", "places.userRatingCount", "places.businessStatus", "places.primaryType", "places.googleMapsUri"]
+  "openStreetMap": {
+    "geocoder": "https://nominatim.openstreetmap.org/search",
+    "overpass": "https://overpass-api.de/api/interpreter",
+    "defaultRadiusMeters": 10000,
+    "attribution": "© OpenStreetMap contributors"
+  },
+  "scoring": {
+    "version": 1,
+    "method": "evidence-weighted-opportunity-triage",
+    "dimensions": ["fit", "market-proof", "conversion-friction", "website-quality"],
+    "disclaimer": "Not a prediction of revenue, rankings, or conversion."
   }
 }
